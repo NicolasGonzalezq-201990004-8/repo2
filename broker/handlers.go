@@ -111,10 +111,10 @@ func (s *BrokerServer) StartEventSimulation(ctx context.Context) {
 
 		s.BroadcastUpdate(ctx, updateMsg) //función que hace broadcast a los datanodes
 
-//		if updateValue == "Llegó" || updateValue == "Embarcando" {
-//			log.Printf("[Eventos] Vuelo %s requiere PISTA. Iniciando consenso...", updateMsg.FlightId)
-//			go s.RequestRunwayAssignment(context.Background(), updateMsg.FlightId)
-//		}
+		//		if updateValue == "Llegó" || updateValue == "Embarcando" {
+		//			log.Printf("[Eventos] Vuelo %s requiere PISTA. Iniciando consenso...", updateMsg.FlightId)
+		//			go s.RequestRunwayAssignment(context.Background(), updateMsg.FlightId)
+		//		}
 
 	}
 
