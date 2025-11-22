@@ -10,6 +10,7 @@ import (
 	cmpb "lab_3/proto/common/cmpb"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type MRClient struct {
@@ -20,7 +21,13 @@ type MRClient struct {
 }
 
 func NewMRClient(brokerAddr string) (*MRClient, error) {
-	conn, err := grpc.Dial(brokerAddr, grpc.WithInsecure())
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, brokerAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("no se pudo conectar al broker: %v", err)
 	}
