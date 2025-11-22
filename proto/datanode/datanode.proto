@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package datanode;
+import "proto/common/common.proto";
+
+option go_package = "lab_3/proto/datanode/dpb;dpb";
+
+service DatanodeService {
+  rpc ApplyUpdate(common.FlightUpdate) returns (common.Empty);
+  rpc Gossip(common.FlightUpdate) returns (common.Empty);
+  rpc GetSeats(common.SeatsRequest) returns (common.SeatsResponse);
+  rpc GetFlightState(common.GetFlightRequest) returns (common.FlightState);
+  rpc GetBoardingPass(common.BoardingPassRequest) returns (common.BoardingPassResponse);
+  rpc CheckIn(common.CheckInRequest) returns (common.CheckInResponse);
+}

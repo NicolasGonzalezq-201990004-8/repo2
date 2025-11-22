@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package broker;
+import "proto/common/common.proto";
+
+option go_package = "lab_3/proto/broker/bpb;bpb";
+
+service BrokerService {
+  rpc QueryFlight(common.GetFlightRequest) returns (common.FlightState); //consulta estado de vuelo de cliente MR
+  rpc GetDatanode(common.Empty) returns (DatanodeResponse); //Solicitud del coordinador para registrar afinidad
+  rpc GetSeats(common.SeatsRequest) returns (common.SeatsResponse); //Solicitud de asientos disponibles
+  rpc CheckIn(common.CheckInRequest) returns (common.CheckInResponse); //Solicitud de Check-in del coordinador
+  rpc GetBoardingPass(common.BoardingPassRequest) returns (common.BoardingPassResponse); //Solicitud de Tarjeta de Embarque del coordinador
+  
+}
+
+
+
+message DatanodeResponse {
+  string datanode_id = 1;
+}

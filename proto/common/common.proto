@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package common;
+
+option go_package = "lab_3/proto/common/cmpb;cmpb";
+
+message GetFlightRequest {
+  string flight_id = 1;
+  map<string, int32> client_version = 2; // para monotonic reads
+}
+
+message FlightUpdate {
+  string flight_id = 1;
+  string status = 2;       // "A tiempo", "Retrasado", etc.
+  string gate = 3;
+  map<string, int32> vector_clock = 4; // Reloj vectorial
+}
+
+message FlightState {
+  string flight_id = 1;
+  string status = 2;
+  string gate = 3;
+  map<string, int32> vector_clock = 4;
+}
+
+message SeatsRequest {
+  string flight_id = 1;
+  string passenger_id = 2;
+}
+
+message SeatsResponse {
+  map<string, bool> seats_map = 1;// Clave: string (ej. "21A", "05C") | Valor: false = no disponible, true = disponible
+}
+
+message CheckInRequest {
+  string seat = 1;
+  string flight_id = 2;
+  string target_datanode_id = 3;
+  string passenger_id = 4;
+}
+
+message CheckInResponse {
+  bool success = 1;
+
+}
+
+message BoardingPassRequest {
+  string passenger_id = 1;
+  string flight_id = 2;
+}
+
+message BoardingPassResponse {
+  string flight_id = 1;
+  string seat = 2;
+  string gate = 3;
+}
+
+message Empty {}

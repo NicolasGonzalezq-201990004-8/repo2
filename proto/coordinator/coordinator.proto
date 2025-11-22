@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package coordinator;
+import "proto/common/common.proto";
+
+option go_package = "lab_3/proto/coordinator/cdpb;cdpb";
+
+service CoordinatorService {
+  rpc GetSeats(common.SeatsRequest) returns (common.SeatsResponse);
+  rpc CheckIn(common.CheckInRequest) returns (common.CheckInResponse);
+  rpc GetBoardingPass(common.BoardingPassRequest) returns (common.BoardingPassResponse);
+}

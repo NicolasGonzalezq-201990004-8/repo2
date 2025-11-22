@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package consensus;
+
+option go_package = "lab_3/proto/consensus/cspb;cspb";
+
+service ConsensusService {
+  rpc RequestRunwayAssignment(RunwayRequest) returns (RunwayResponse); // Solicitud del broker para asignar pista.
+}
+
+service InternalConsensusService {
+  rpc AppendEntry(Decision) returns (DecisionAck);
+  rpc RequestVote(VoteRequest) returns (VoteResponse);
+}
+
+message RunwayRequest {
+  string flight_id = 1;
+  string operation = 2; //"ASSIGN" o "RELEASE"
+  string runway_id = 3;
+}
+
+message RunwayResponse {
+  bool success = 1;
+  string runway_id = 2;
+}
+
+message Decision {
+  string resource = 1;  // pista
+  string assigned_to = 2; // vuelo
+  int32 prev_term = 3;
+  int32 prev_index = 4;
+  string operation = 5; //"ASSIGN" o "RELEASE"
+}
+
+message DecisionAck {
+  bool committed = 1;
+  string msg = 2;
+}
+
+message VoteRequest {
+  int32 term = 1;
+  string candidate_id = 2;
+}
+
+message VoteResponse {
+  bool vote_granted = 1;
+  int32 term = 2;
+}
