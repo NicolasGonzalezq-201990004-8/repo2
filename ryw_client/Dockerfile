@@ -1,13 +1,16 @@
 FROM golang:1.25-alpine AS builder
-WORKDIR /src
+WORKDIR /go/src/lab_3
+# Fuerza el modo módulo y deshabilita workspaces para evitar que Go vuelva al
+# GOPATH al resolver imports locales durante la construcción.
+ENV GO111MODULE=on \
+    GOWORK=off \
+    GOFLAGS=-mod=mod
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY proto ./proto
+COPY . .
 
-COPY ryw_client ./ryw_client
-
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/ryw_client ./ryw_client
+RUN GO111MODULE=on GOWORK=off GOFLAGS=-mod=mod CGO_ENABLED=0 GOOS=linux go build -o /app/ryw_client ./ryw_client
 
 FROM alpine:latest
 WORKDIR /app
