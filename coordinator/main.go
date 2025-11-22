@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
 
 	cdpb "lab_3/proto/coordinator/cdpb"
 
@@ -16,13 +17,14 @@ func main() {
 		log.Fatal("COORDINATOR_PORT no configurado")
 	}
 
-	if port[0] != ':' {
-		port = ":" + port
+	listenAddr := port
+	if !strings.Contains(listenAddr, ":") {
+		listenAddr = ":" + listenAddr
 	}
 
-	log.Printf("Iniciando Coordinator en puerto %s...", port)
+	log.Printf("Iniciando Coordinator en %s...", listenAddr)
 
-	lis, err := net.Listen("tcp", port)
+	lis, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		log.Fatalf("Error al escuchar: %v", err)
 	}

@@ -1,10 +1,9 @@
 .PHONY: all clean docker-up docker-down docker-vm1 docker-vm2 docker-vm3 docker-vm4
 .PHONY: docker-logs docker-logs-vm1 docker-logs-vm2 docker-logs-vm3 docker-logs-vm4
 
-
 DOCKER_COMPOSE := docker-compose
 
-clean:
+clean: 
 
 # ----------
 # DOCKER
