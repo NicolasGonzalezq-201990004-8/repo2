@@ -2,14 +2,13 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /src
 
-ENV GO111MODULE=on
+ENV GO111MODULE=on \
+    GOFLAGS=-mod=mod
 
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY proto ./proto
-
-COPY consensus ./consensus
+COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app/consensusnode ./consensus
 
