@@ -1,7 +1,7 @@
 # ---------- STAGE 1: BUILD ----------
 FROM golang:1.25-alpine AS builder
 
-WORKDIR /src
+WORKDIR /app
 
 # Copiar los archivos de dependencias
 COPY go.mod go.sum ./
@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 
 # Compilar SOLO el datanode
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/datanode ./datanode
+RUN GO111MODULE=on CGO_ENABLED=0 GOOS=linux go build -o /app/datanode ./datanode
 
 
 # ---------- STAGE 2: RUNTIME ----------
