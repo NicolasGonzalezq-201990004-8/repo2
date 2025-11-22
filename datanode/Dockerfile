@@ -1,7 +1,7 @@
 # ---------- STAGE 1: BUILD ----------
 FROM golang:1.25-alpine AS builder
 
-WORKDIR /src
+WORKDIR /go/src/lab_3
 
 ENV GO111MODULE=on \
     GOFLAGS=-mod=mod

@@ -1,6 +1,7 @@
 FROM golang:1.25-alpine AS builder
 
-WORKDIR /src
+# Keep the source under GOPATH so module imports resolve even if module mode is off.
+WORKDIR /go/src/lab_3
 
 ENV GO111MODULE=on \
     GOFLAGS=-mod=mod
