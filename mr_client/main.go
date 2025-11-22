@@ -87,7 +87,6 @@ func main() {
 
 	// Lanzar dos clientes en paralelo
 	go mrWorker(1, brokerAddr, flights)
-	go mrWorker(2, brokerAddr, flights)
 
 	select {}
 }
