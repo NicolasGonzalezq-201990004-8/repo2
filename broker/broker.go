@@ -13,12 +13,13 @@ import (
 	bpb "lab_3/proto/broker/bpb"
 	cspb "lab_3/proto/consensus/cspb"
 
-	//cdpb "lab_3/proto/coordinator/cdpb"
+	// cdpb "lab_3/proto/coordinator/cdpb"
 	cmpb "lab_3/proto/common/cmpb"
 	dpb "lab_3/proto/datanode/dpb"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
@@ -53,14 +54,14 @@ func NewBrokerServer() *BrokerServer {
 		// Usar direcciones locales no funcionales que satisfagan el strings.Split
 		datanodeAddrsStr = "127.0.0.1:1,127.0.0.1:2"
 	}
-	datanodeAddrs := strings.Split(datanodeAddrsStr, ",")
+	datanodeAddrs := splitAndTrim(datanodeAddrsStr)
 
 	consensusAddrsStr := os.Getenv("CONSENSUS_ADDRESSES")
 	if consensusAddrsStr == "" {
 		log.Println("[WARN] CONSENSUS_ADDRESSES no configurada. Usando mock local.")
 		consensusAddrsStr = "127.0.0.1:3,127.0.0.1:4,127.0.0.1:5"
 	}
-	consensusAddrs := strings.Split(consensusAddrsStr, ",")
+	consensusAddrs := splitAndTrim(consensusAddrsStr)
 
 	server := &BrokerServer{
 		datanodeClients:    make([]dpb.DatanodeServiceClient, 0),
@@ -76,27 +77,18 @@ func NewBrokerServer() *BrokerServer {
 	}
 	for _, addr := range datanodeAddrs {
 		log.Printf("Intentando conexión con el Datanode %s", addr)
-		conn, err := grpc.Dial(addr, grpc.WithInsecure()) //, grpc.WithBlock()
-		if err != nil {
-			log.Fatalf("No se pudo conectar al Datanode %s: %v", addr, err)
+		if err := server.connectDatanode(addr); err != nil {
+			log.Printf("[WARN] No se pudo conectar al Datanode %s en el arranque: %v. Se reintentará en segundo plano.", addr, err)
+			go server.retryConnectDatanode(addr)
 		}
-
-		client := dpb.NewDatanodeServiceClient(conn)
-		server.datanodeClients = append(server.datanodeClients, client)
-		server.datanodeAddresses = append(server.datanodeAddresses, addr)
-		log.Printf("Broker conectado al Datanode %s", addr)
 	}
 
 	for _, addr := range consensusAddrs {
 		log.Printf("Intentando conexión con el Nodo de consenso %s", addr)
-		conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
-		if err != nil {
-			log.Fatalf("No se pudo conectar al Nodo de Consenso %s: %v", addr, err)
+		if err := server.connectConsensus(addr); err != nil {
+			log.Printf("[WARN] No se pudo conectar al Nodo de Consenso %s en el arranque: %v. Se reintentará en segundo plano.", addr, err)
+			go server.retryConnectConsensus(addr)
 		}
-		client := cspb.NewConsensusServiceClient(conn)
-		server.consensusClients = append(server.consensusClients, client)
-		server.consensusAddresses = append(server.consensusAddresses, addr)
-		log.Printf("Broker conectado al nodo de Consenso %s", addr)
 	}
 	//FASE 1
 	server.loadFlightCatalog()
@@ -138,56 +130,56 @@ func (s *BrokerServer) GetDatanode(ctx context.Context, req *cmpb.Empty) (*bpb.D
 }
 
 func (s *BrokerServer) CheckIn(ctx context.Context, req *cmpb.CheckInRequest) (*cmpb.CheckInResponse, error) {
-    var datanodeClient dpb.DatanodeServiceClient
+	var datanodeClient dpb.DatanodeServiceClient
 
-    // 1) Intentar respetar afinidad si viene TargetDatanodeId
-    if req.TargetDatanodeId != "" {
-        s.mu.Lock()
-        for i, addr := range s.datanodeAddresses {
-            if addr == req.TargetDatanodeId {
-                datanodeClient = s.datanodeClients[i]
-                break
-            }
-        }
-        s.mu.Unlock()
+	// 1) Intentar respetar afinidad si viene TargetDatanodeId
+	if req.TargetDatanodeId != "" {
+		s.mu.Lock()
+		for i, addr := range s.datanodeAddresses {
+			if addr == req.TargetDatanodeId {
+				datanodeClient = s.datanodeClients[i]
+				break
+			}
+		}
+		s.mu.Unlock()
 
-        if datanodeClient != nil {
-            log.Printf("[Broker] Check-In con afinidad: redirigiendo a %s", req.TargetDatanodeId)
-        } else {
-            log.Printf("[Broker] WARNING: TargetDatanodeId=%s no encontrado, usando round-robin", req.TargetDatanodeId)
-        }
-    }
+		if datanodeClient != nil {
+			log.Printf("[Broker] Check-In con afinidad: redirigiendo a %s", req.TargetDatanodeId)
+		} else {
+			log.Printf("[Broker] WARNING: TargetDatanodeId=%s no encontrado, usando round-robin", req.TargetDatanodeId)
+		}
+	}
 
-    // 2) Si no había afinidad válida, usar round-robin
-    if datanodeClient == nil {
-        var addr string
-        datanodeClient, addr = s.selectNextDatanode()
-        if datanodeClient == nil {
-            return nil, status.Errorf(codes.Unavailable, "No hay Datanodes disponibles para el Check-in.")
-        }
-        log.Printf("[Broker] Check-In sin afinidad. Usando Datanode %s (round-robin).", addr)
-    }
+	// 2) Si no había afinidad válida, usar round-robin
+	if datanodeClient == nil {
+		var addr string
+		datanodeClient, addr = s.selectNextDatanode()
+		if datanodeClient == nil {
+			return nil, status.Errorf(codes.Unavailable, "No hay Datanodes disponibles para el Check-in.")
+		}
+		log.Printf("[Broker] Check-In sin afinidad. Usando Datanode %s (round-robin).", addr)
+	}
 
-    log.Printf("[Broker] Enrutando solicitud de Check-In para Vuelo %s (Passenger=%s, Seat=%s).",
-        req.FlightId, req.PassengerId, req.Seat)
+	log.Printf("[Broker] Enrutando solicitud de Check-In para Vuelo %s (Passenger=%s, Seat=%s).",
+		req.FlightId, req.PassengerId, req.Seat)
 
-    resp, err := datanodeClient.CheckIn(ctx, req)
-    if err != nil {
-        log.Printf("Error al redirigir Check-In al Datanode: %v", err)
-        return nil, err
-    }
+	resp, err := datanodeClient.CheckIn(ctx, req)
+	if err != nil {
+		log.Printf("Error al redirigir Check-In al Datanode: %v", err)
+		return nil, err
+	}
 
-    if resp.Success {
-        log.Printf("[Broker] Check-In exitoso para Vuelo %s | Asiento: %s.", req.FlightId, req.Seat)
-        s.reportChan <- fmt.Sprintf("CHECK-IN EXITOSO: Vuelo %s | Asiento: %s (Passenger=%s)",
-            req.FlightId, req.Seat, req.PassengerId)
-    } else {
-        log.Printf("[Broker] Check-In fallido para Vuelo %s | Asiento: %s.", req.FlightId, req.Seat)
-        s.reportChan <- fmt.Sprintf("CHECK-IN FALLIDO: Vuelo %s | Asiento: %s (Passenger=%s)",
-            req.FlightId, req.Seat, req.PassengerId)
-    }
+	if resp.Success {
+		log.Printf("[Broker] Check-In exitoso para Vuelo %s | Asiento: %s.", req.FlightId, req.Seat)
+		s.reportChan <- fmt.Sprintf("CHECK-IN EXITOSO: Vuelo %s | Asiento: %s (Passenger=%s)",
+			req.FlightId, req.Seat, req.PassengerId)
+	} else {
+		log.Printf("[Broker] Check-In fallido para Vuelo %s | Asiento: %s.", req.FlightId, req.Seat)
+		s.reportChan <- fmt.Sprintf("CHECK-IN FALLIDO: Vuelo %s | Asiento: %s (Passenger=%s)",
+			req.FlightId, req.Seat, req.PassengerId)
+	}
 
-    return resp, nil
+	return resp, nil
 }
 
 func (s *BrokerServer) RequestRunwayAssignment(ctx context.Context, flightID string) (*cspb.RunwayResponse, error) {
@@ -234,22 +226,22 @@ func (s *BrokerServer) RequestRunwayAssignment(ctx context.Context, flightID str
 }
 
 func (s *BrokerServer) BroadcastUpdate(ctx context.Context, update *cmpb.FlightUpdate) {
-    dnClient, addr := s.selectNextDatanode()
-    if dnClient == nil {
-        log.Printf("[Broker] No hay datanodes disponibles para BroadcastUpdate de vuelo %s", update.FlightId)
-        return
-    }
+	dnClient, addr := s.selectNextDatanode()
+	if dnClient == nil {
+		log.Printf("[Broker] No hay datanodes disponibles para BroadcastUpdate de vuelo %s", update.FlightId)
+		return
+	}
 
-    log.Printf("[Broker] Enviando actualización de vuelo %s (Status: %s, Gate: %s) al Datanode %s",
-        update.FlightId, update.Status, update.Gate, addr)
+	log.Printf("[Broker] Enviando actualización de vuelo %s (Status: %s, Gate: %s) al Datanode %s",
+		update.FlightId, update.Status, update.Gate, addr)
 
-    go func() {
-        _, err := dnClient.ApplyUpdate(context.Background(), update)
-        if err != nil {
-            log.Printf("[Broker] Error al enviar actualización (Vuelo: %s) al Datanode %s: %v",
-                update.FlightId, addr, err)
-        }
-    }()
+	go func() {
+		_, err := dnClient.ApplyUpdate(context.Background(), update)
+		if err != nil {
+			log.Printf("[Broker] Error al enviar actualización (Vuelo: %s) al Datanode %s: %v",
+				update.FlightId, addr, err)
+		}
+	}()
 }
 
 func (s *BrokerServer) GetSeats(ctx context.Context, req *cmpb.SeatsRequest) (*cmpb.SeatsResponse, error) {
@@ -319,5 +311,87 @@ func (s *BrokerServer) sendConsensusRequest(ctx context.Context, req *cspb.Runwa
 
 		return nil, err
 	}
-	return nil, status.Errorf(codes.Unavailable, "No se pudo completar la operación de consenso depsués de %d reintentos", maxRetries)
+	return nil, status.Errorf(codes.Unavailable, "No se pudo completar la operación de consenso después de %d reintentos", maxRetries)
+}
+
+func splitAndTrim(addressList string) []string {
+	parts := strings.Split(addressList, ",")
+	for i, p := range parts {
+		parts[i] = strings.TrimSpace(p)
+	}
+	return parts
+}
+
+func (s *BrokerServer) connectDatanode(addr string) error {
+	conn, err := dialWithTimeout(addr)
+	if err != nil {
+		return err
+	}
+
+	client := dpb.NewDatanodeServiceClient(conn)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.datanodeClients = append(s.datanodeClients, client)
+	s.datanodeAddresses = append(s.datanodeAddresses, addr)
+	log.Printf("Broker conectado al Datanode %s", addr)
+	return nil
+}
+
+func (s *BrokerServer) retryConnectDatanode(addr string) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		<-ticker.C
+		log.Printf("[Retry] Reintentando conexión con Datanode %s...", addr)
+		if err := s.connectDatanode(addr); err != nil {
+			log.Printf("[Retry] Datanode %s aún no disponible: %v", addr, err)
+			continue
+		}
+		return
+	}
+}
+
+func (s *BrokerServer) connectConsensus(addr string) error {
+	conn, err := dialWithTimeout(addr)
+	if err != nil {
+		return err
+	}
+
+	client := cspb.NewConsensusServiceClient(conn)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.consensusClients = append(s.consensusClients, client)
+	s.consensusAddresses = append(s.consensusAddresses, addr)
+	log.Printf("Broker conectado al nodo de Consenso %s", addr)
+	return nil
+}
+
+func (s *BrokerServer) retryConnectConsensus(addr string) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		<-ticker.C
+		log.Printf("[Retry] Reintentando conexión con Nodo de Consenso %s...", addr)
+		if err := s.connectConsensus(addr); err != nil {
+			log.Printf("[Retry] Nodo de Consenso %s aún no disponible: %v", addr, err)
+			continue
+		}
+		return
+	}
+}
+
+func dialWithTimeout(addr string) (*grpc.ClientConn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	return grpc.DialContext(ctx, addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
 }

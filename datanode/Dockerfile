@@ -3,6 +3,9 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /src
 
+ENV GO111MODULE=on \
+    GOFLAGS=-mod=mod
+
 # Copiar los archivos de dependencias
 COPY go.mod go.sum ./
 RUN go mod download

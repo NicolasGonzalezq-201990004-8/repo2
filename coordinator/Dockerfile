@@ -2,12 +2,13 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /src
 
+ENV GO111MODULE=on \
+    GOFLAGS=-mod=mod
+
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY proto ./proto
-
-COPY coordinator ./coordinator
+COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app/coordinator ./coordinator
 
