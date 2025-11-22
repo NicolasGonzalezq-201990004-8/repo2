@@ -7,6 +7,9 @@ WORKDIR /go/src/lab_3
 ENV GO111MODULE=on \
     GOFLAGS=-mod=mod
 
+ENV GO111MODULE=on \
+    GOFLAGS=-mod=mod
+
 COPY go.mod go.sum ./
 
 RUN go mod download
