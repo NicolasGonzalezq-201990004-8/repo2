@@ -180,11 +180,14 @@ make docker-vm1        # Levanta los contenedores asignados a la VM1
 make docker-vm2        # Levanta los contenedores asignados a la VM2
 make docker-vm3        # Levanta los contenedores asignados a la VM3
 make docker-vm4        # Levanta los contenedores asignados a la VM4
+make docker-logs       # Muestra logs de todos los servicios levantados en la VM actual
+make docker-logs-vmX   # Muestra logs solo de los servicios del perfil vmX (por ejemplo vm1)
 make clean             # Detiene y borra artefactos generados por los .proto
 
 ```
 
 > Cada VM debe clonar el repositorio y ejecutar el `make docker-vmx` que le corresponda.
+> Para ver los `fmt.Println` y logs de cada contenedor, ejecuta `make docker-logs-vmx` en esa VM (o `make docker-logs` si levantaste todo con `make docker-up`).
 
 #### Distribución por máquina virtual
 
