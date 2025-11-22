@@ -14,7 +14,7 @@ import (
 func main() {
 	brokerPort := os.Getenv("BROKER_PORT")
 	if brokerPort == "" {
-		log.Fatal("La variable de entorno DATANODE_ADDRESSES no está configurada.")
+		log.Fatal("La variable de entorno BROKER_PORT no está configurada.")
 	}
 	if brokerPort[0] != ':' {
 		brokerPort = ":" + brokerPort
