@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"time"
 
 	bpb "lab_3/proto/broker/bpb"
 	cdpb "lab_3/proto/coordinator/cdpb"
@@ -28,12 +29,7 @@ func NewCoordinatorServer() *CoordinatorServer {
 		log.Fatal("BROKER_ADDR no configurada")
 	}
 
-	conn, err := grpc.Dial(brokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("No se pudo conectar al Broker en %s: %v", brokerAddr, err)
-	}
-
-	log.Printf("[Coordinator] Conectado al Broker en %s", brokerAddr)
+	conn := dialBrokerWithRetry(brokerAddr)
 
 	return &CoordinatorServer{
 		sessions:     NewSessionMap(),
@@ -42,11 +38,31 @@ func NewCoordinatorServer() *CoordinatorServer {
 }
 
 func (s *CoordinatorServer) getDatanodeClient(addr string) (dpb.DatanodeServiceClient, *grpc.ClientConn, error) {
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {
 		return nil, nil, err
 	}
 	return dpb.NewDatanodeServiceClient(conn), conn, nil
+}
+
+func dialBrokerWithRetry(brokerAddr string) *grpc.ClientConn {
+	for attempt := 1; ; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+		conn, err := grpc.DialContext(ctx, brokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+		cancel()
+
+		if err == nil {
+			log.Printf("[Coordinator] Conectado al Broker en %s", brokerAddr)
+			return conn
+		}
+
+		log.Printf("[Coordinator] Reintento %d conectando al Broker en %s: %v", attempt, brokerAddr, err)
+		time.Sleep(2 * time.Second)
+	}
 }
 
 func (s *CoordinatorServer) CheckIn(ctx context.Context, req *cmpb.CheckInRequest) (*cmpb.CheckInResponse, error) {
