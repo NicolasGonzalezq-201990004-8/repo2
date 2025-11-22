@@ -1,3 +1,4 @@
+version: "3.8"
 
 services:
   # -----------------
@@ -5,33 +6,36 @@ services:
   # -----------------
   broker:
     build:
-      context: . 
-      dockerfile: broker/Dockerfile 
+      context: .
+      dockerfile: broker/Dockerfile
     ports:
-      # Expone el puerto del Broker al host (ej. 50050)
       - "50050:50050"
     environment:
       - BROKER_PORT=50050
-      - DATANODE_ADDRESSES=datanode1:50051,datanode2:50051,datanode3:50051
-      - CONSENSUS_ADDRESSES=consensus1:50060,consensus2:50060,consensus3:50060
-    depends_on:
-      - datanode1
-      - datanode2
-      - datanode3
-      - consensus1
-      - consensus2
-      - consensus3
-    
-  mr_client:
-    container_name: mr_client
+      - DATANODE_ADDRESSES=10.35.168.17:50051,10.35.168.112:50051,10.35.168.15:50051
+      - CONSENSUS_ADDRESSES=10.35.168.16:50060,10.35.168.17:50060,10.35.168.112:50060
+    profiles:
+      - vm1
+
+  mr_client1:
+    container_name: mr_client1
     build:
       context: .
       dockerfile: mr_client/Dockerfile
     environment:
-      - BROKER_ADDR=broker:50050
-    depends_on:
-      - broker
-    
+      - BROKER_ADDR=10.35.168.15:50050
+    profiles:
+      - vm1
+
+  mr_client2:
+    container_name: mr_client2
+    build:
+      context: .
+      dockerfile: mr_client/Dockerfile
+    environment:
+      - BROKER_ADDR=10.35.168.15:50050
+    profiles:
+      - vm2
 
   datanode1:
     build:
@@ -39,11 +43,13 @@ services:
       dockerfile: datanode/Dockerfile
     environment:
       - DATANODE_ID=D1
-      - DATANODE_ADDR=datanode1:50051
-      - DATANODE_ADDRESSES=datanode1:50051,datanode2:50051,datanode3:50051
+      - DATANODE_ADDR=10.35.168.17:50051
+      - DATANODE_ADDRESSES=10.35.168.17:50051,10.35.168.112:50051,10.35.168.15:50051
       - DATANODE_PORT=50051
     ports:
       - "50051:50051"
+    profiles:
+      - vm3
 
   datanode2:
     build:
@@ -51,9 +57,13 @@ services:
       dockerfile: datanode/Dockerfile
     environment:
       - DATANODE_ID=D2
-      - DATANODE_ADDR=datanode2:50051
-      - DATANODE_ADDRESSES=datanode1:50051,datanode2:50051,datanode3:50051
+      - DATANODE_ADDR=10.35.168.112:50051
+      - DATANODE_ADDRESSES=10.35.168.17:50051,10.35.168.112:50051,10.35.168.15:50051
       - DATANODE_PORT=50051
+    ports:
+      - "50051:50051"
+    profiles:
+      - vm4
 
   datanode3:
     build:
@@ -61,66 +71,73 @@ services:
       dockerfile: datanode/Dockerfile
     environment:
       - DATANODE_ID=D3
-      - DATANODE_ADDR=datanode3:50051
-      - DATANODE_ADDRESSES=datanode1:50051,datanode2:50051,datanode3:50051
+      - DATANODE_ADDR=10.35.168.15:50051
+      - DATANODE_ADDRESSES=10.35.168.17:50051,10.35.168.112:50051,10.35.168.15:50051
       - DATANODE_PORT=50051
+    ports:
+      - "50051:50051"
+    profiles:
+      - vm1
 
-# ----------------------------------------
+  # ----------------------------------------
   # CLÚSTER DE CONSENSO (ATC)
   # ----------------------------------------
-  
-  # NODO 1
+
   consensus1:
     container_name: consensus1
     build:
       context: .
       dockerfile: consensus/Dockerfile
     ports:
-      - "50061:50060" 
+      - "50060:50060"
     environment:
       - NODE_ID=ATC-1
       - CONSENSUS_PORT=:50060
-      - PEER_ADDRESSES=ATC-2=consensus2:50060,ATC-3=consensus3:50060
+      - PEER_ADDRESSES=ATC-2=10.35.168.17:50060,ATC-3=10.35.168.112:50060
+    profiles:
+      - vm2
 
-  # NODO 2
   consensus2:
     container_name: consensus2
     build:
       context: .
       dockerfile: consensus/Dockerfile
     ports:
-      - "50062:50060"
+      - "50060:50060"
     environment:
       - NODE_ID=ATC-2
       - CONSENSUS_PORT=:50060
-      - PEER_ADDRESSES=ATC-1=consensus1:50060,ATC-3=consensus3:50060
+      - PEER_ADDRESSES=ATC-1=10.35.168.16:50060,ATC-3=10.35.168.112:50060
+    profiles:
+      - vm3
 
-  # NODO 3
   consensus3:
     container_name: consensus3
     build:
       context: .
       dockerfile: consensus/Dockerfile
     ports:
-      - "50063:50060"
+      - "50060:50060"
     environment:
       - NODE_ID=ATC-3
       - CONSENSUS_PORT=:50060
-      - PEER_ADDRESSES=ATC-1=consensus1:50060,ATC-2=consensus2:50060
+      - PEER_ADDRESSES=ATC-1=10.35.168.16:50060,ATC-2=10.35.168.17:50060
+    profiles:
+      - vm4
 
-#COORDINADOR
+  # COORDINADOR
   coordinator:
     build:
       context: .
-      dockerfile: coordinator/Dockerfile 
+      dockerfile: coordinator/Dockerfile
     ports:
       - "50070:50070"
     environment:
       - COORDINATOR_PORT=:50070
-      - BROKER_ADDR=broker:50050
-    depends_on:
-      - broker
-  
+      - BROKER_ADDR=10.35.168.15:50050
+    profiles:
+      - vm4
+
   # CLIENTES RYW (Pasajeros)
   ryw_client1:
     build:
@@ -128,9 +145,9 @@ services:
       dockerfile: ryw_client/Dockerfile
     environment:
       - CLIENT_ID=Pasajero-1
-      - COORDINATOR_ADDR=coordinator:50070
-    depends_on:
-      - coordinator
+      - COORDINATOR_ADDR=10.35.168.112:50070
+    profiles:
+      - vm1
 
   ryw_client2:
     build:
@@ -138,9 +155,9 @@ services:
       dockerfile: ryw_client/Dockerfile
     environment:
       - CLIENT_ID=Pasajero-2
-      - COORDINATOR_ADDR=coordinator:50070
-    depends_on:
-      - coordinator
+      - COORDINATOR_ADDR=10.35.168.112:50070
+    profiles:
+      - vm2
 
   ryw_client3:
     build:
@@ -148,6 +165,6 @@ services:
       dockerfile: ryw_client/Dockerfile
     environment:
       - CLIENT_ID=Pasajero-3
-      - COORDINATOR_ADDR=coordinator:50070
-    depends_on:
-      - coordinator
+      - COORDINATOR_ADDR=10.35.168.112:50070
+    profiles:
+      - vm3

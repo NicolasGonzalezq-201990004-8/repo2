@@ -1,25 +1,31 @@
 FROM golang:1.25-alpine AS builder
 
-WORKDIR /src
+# Usa la carpeta del proyecto como raíz de módulo; Go trabaja en modo módulo
+# por defecto y las imports locales "lab_3/..." se resuelven sin depender de
+# GOPATH.
+WORKDIR /app
+
+ENV GO111MODULE=on
+ENV GOFLAGS=-mod=mod
 
 COPY go.mod go.sum ./
-
 RUN go mod download
 
-COPY proto ./proto
+COPY . .
 
-COPY broker ./broker
-
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/broker ./broker
+RUN mkdir -p /app/bin \
+    && CGO_ENABLED=0 GOOS=linux go build -o /app/bin/broker ./broker
 
 FROM alpine:latest
 
 WORKDIR /app
 
-COPY --from=builder /app/broker /app/broker
+# Instala el binario en una ruta del $PATH para evitar cualquier choque con
+# directorios llamados "/app/broker".
+COPY --from=builder /app/bin/broker /usr/local/bin/broker
 
 COPY flight_updates.csv .
 
-EXPOSE 50050 
+EXPOSE 50050
 
-CMD ["/app/broker"]
+ENTRYPOINT ["broker"]
