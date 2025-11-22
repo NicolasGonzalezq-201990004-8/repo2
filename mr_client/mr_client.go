@@ -21,15 +21,24 @@ type MRClient struct {
 }
 
 func NewMRClient(brokerAddr string) (*MRClient, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
+	var conn *grpc.ClientConn
+	var err error
 
-	conn, err := grpc.DialContext(ctx, brokerAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("no se pudo conectar al broker: %v", err)
+	for attempt := 1; ; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+
+		conn, err = grpc.DialContext(ctx, brokerAddr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithBlock(),
+		)
+		cancel()
+
+		if err == nil {
+			break
+		}
+
+		log.Printf("[MR] No se pudo conectar al broker (%s): %v. Reintento #%d en 3s...", brokerAddr, err, attempt)
+		time.Sleep(3 * time.Second)
 	}
 
 	c := &MRClient{

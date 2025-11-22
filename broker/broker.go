@@ -77,27 +77,18 @@ func NewBrokerServer() *BrokerServer {
 	}
 	for _, addr := range datanodeAddrs {
 		log.Printf("Intentando conexión con el Datanode %s", addr)
-		conn, err := dialWithTimeout(addr)
-		if err != nil {
-			log.Fatalf("No se pudo conectar al Datanode %s: %v", addr, err)
+		if err := server.connectDatanode(addr); err != nil {
+			log.Printf("[WARN] No se pudo conectar al Datanode %s en el arranque: %v. Se reintentará en segundo plano.", addr, err)
+			go server.retryConnectDatanode(addr)
 		}
-
-		client := dpb.NewDatanodeServiceClient(conn)
-		server.datanodeClients = append(server.datanodeClients, client)
-		server.datanodeAddresses = append(server.datanodeAddresses, addr)
-		log.Printf("Broker conectado al Datanode %s", addr)
 	}
 
 	for _, addr := range consensusAddrs {
 		log.Printf("Intentando conexión con el Nodo de consenso %s", addr)
-		conn, err := dialWithTimeout(addr)
-		if err != nil {
-			log.Fatalf("No se pudo conectar al Nodo de Consenso %s: %v", addr, err)
+		if err := server.connectConsensus(addr); err != nil {
+			log.Printf("[WARN] No se pudo conectar al Nodo de Consenso %s en el arranque: %v. Se reintentará en segundo plano.", addr, err)
+			go server.retryConnectConsensus(addr)
 		}
-		client := cspb.NewConsensusServiceClient(conn)
-		server.consensusClients = append(server.consensusClients, client)
-		server.consensusAddresses = append(server.consensusAddresses, addr)
-		log.Printf("Broker conectado al nodo de Consenso %s", addr)
 	}
 	//FASE 1
 	server.loadFlightCatalog()
@@ -320,7 +311,7 @@ func (s *BrokerServer) sendConsensusRequest(ctx context.Context, req *cspb.Runwa
 
 		return nil, err
 	}
-	return nil, status.Errorf(codes.Unavailable, "No se pudo completar la operación de consenso depsués de %d reintentos", maxRetries)
+	return nil, status.Errorf(codes.Unavailable, "No se pudo completar la operación de consenso después de %d reintentos", maxRetries)
 }
 
 func splitAndTrim(addressList string) []string {
@@ -329,6 +320,70 @@ func splitAndTrim(addressList string) []string {
 		parts[i] = strings.TrimSpace(p)
 	}
 	return parts
+}
+
+func (s *BrokerServer) connectDatanode(addr string) error {
+	conn, err := dialWithTimeout(addr)
+	if err != nil {
+		return err
+	}
+
+	client := dpb.NewDatanodeServiceClient(conn)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.datanodeClients = append(s.datanodeClients, client)
+	s.datanodeAddresses = append(s.datanodeAddresses, addr)
+	log.Printf("Broker conectado al Datanode %s", addr)
+	return nil
+}
+
+func (s *BrokerServer) retryConnectDatanode(addr string) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		<-ticker.C
+		log.Printf("[Retry] Reintentando conexión con Datanode %s...", addr)
+		if err := s.connectDatanode(addr); err != nil {
+			log.Printf("[Retry] Datanode %s aún no disponible: %v", addr, err)
+			continue
+		}
+		return
+	}
+}
+
+func (s *BrokerServer) connectConsensus(addr string) error {
+	conn, err := dialWithTimeout(addr)
+	if err != nil {
+		return err
+	}
+
+	client := cspb.NewConsensusServiceClient(conn)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.consensusClients = append(s.consensusClients, client)
+	s.consensusAddresses = append(s.consensusAddresses, addr)
+	log.Printf("Broker conectado al nodo de Consenso %s", addr)
+	return nil
+}
+
+func (s *BrokerServer) retryConnectConsensus(addr string) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		<-ticker.C
+		log.Printf("[Retry] Reintentando conexión con Nodo de Consenso %s...", addr)
+		if err := s.connectConsensus(addr); err != nil {
+			log.Printf("[Retry] Nodo de Consenso %s aún no disponible: %v", addr, err)
+			continue
+		}
+		return
+	}
 }
 
 func dialWithTimeout(addr string) (*grpc.ClientConn, error) {
