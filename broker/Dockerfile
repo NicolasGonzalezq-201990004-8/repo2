@@ -4,10 +4,10 @@ FROM golang:1.25-alpine AS builder
 # "lab_3/proto/..." resolve even if module mode is accidentally disabled.
 WORKDIR /go/src/lab_3
 
+# Fuerza el modo módulos y desactiva posibles workspaces para evitar que Go
+# intente resolver imports en GOPATH cuando se construye dentro del contenedor.
 ENV GO111MODULE=on \
-    GOFLAGS=-mod=mod
-
-ENV GO111MODULE=on \
+    GOWORK=off \
     GOFLAGS=-mod=mod
 
 COPY go.mod go.sum ./
@@ -16,7 +16,7 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/broker ./broker
+RUN GO111MODULE=on GOWORK=off GOFLAGS=-mod=mod CGO_ENABLED=0 GOOS=linux go build -o /app/broker ./broker
 
 FROM alpine:latest
 
