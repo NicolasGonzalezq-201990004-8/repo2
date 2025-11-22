@@ -14,7 +14,7 @@ SUBDIR_consensus := cspb
 SUBDIR_coordinator := cdpb
 SUBDIR_datanode := dpb
 
-DOCKER_COMPOSE := docker compose
+DOCKER_COMPOSE := docker-compose
 
 all: proto
 
