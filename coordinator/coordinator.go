@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	bpb "lab_3/proto/broker/bpb"
@@ -20,7 +21,10 @@ type CoordinatorServer struct {
 	cdpb.UnimplementedCoordinatorServiceServer
 	sessions *SessionMap
 
+	brokerAddr   string
+	brokerConn   *grpc.ClientConn
 	brokerClient bpb.BrokerServiceClient
+	brokerMu     sync.RWMutex
 }
 
 func NewCoordinatorServer() *CoordinatorServer {
@@ -29,12 +33,14 @@ func NewCoordinatorServer() *CoordinatorServer {
 		log.Fatal("BROKER_ADDR no configurada")
 	}
 
-	conn := dialBrokerWithRetry(brokerAddr)
-
-	return &CoordinatorServer{
-		sessions:     NewSessionMap(),
-		brokerClient: bpb.NewBrokerServiceClient(conn),
+	s := &CoordinatorServer{
+		sessions:   NewSessionMap(),
+		brokerAddr: brokerAddr,
 	}
+
+	go s.startBrokerDialLoop()
+
+	return s
 }
 
 func (s *CoordinatorServer) getDatanodeClient(addr string) (dpb.DatanodeServiceClient, *grpc.ClientConn, error) {
@@ -48,26 +54,56 @@ func (s *CoordinatorServer) getDatanodeClient(addr string) (dpb.DatanodeServiceC
 	return dpb.NewDatanodeServiceClient(conn), conn, nil
 }
 
-func dialBrokerWithRetry(brokerAddr string) *grpc.ClientConn {
+func (s *CoordinatorServer) startBrokerDialLoop() {
 	for attempt := 1; ; attempt++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
-		conn, err := grpc.DialContext(ctx, brokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+		conn, err := grpc.DialContext(ctx, s.brokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 		cancel()
 
 		if err == nil {
-			log.Printf("[Coordinator] Conectado al Broker en %s", brokerAddr)
-			return conn
+			s.brokerMu.Lock()
+			s.brokerConn = conn
+			s.brokerClient = bpb.NewBrokerServiceClient(conn)
+			s.brokerMu.Unlock()
+
+			log.Printf("[Coordinator] Conectado al Broker en %s", s.brokerAddr)
+			return
 		}
 
-		log.Printf("[Coordinator] Reintento %d conectando al Broker en %s: %v", attempt, brokerAddr, err)
+		log.Printf("[Coordinator] Reintento %d conectando al Broker en %s: %v", attempt, s.brokerAddr, err)
 		time.Sleep(2 * time.Second)
+	}
+}
+
+func (s *CoordinatorServer) waitForBrokerClient(ctx context.Context) (bpb.BrokerServiceClient, error) {
+	for {
+		s.brokerMu.RLock()
+		client := s.brokerClient
+		s.brokerMu.RUnlock()
+
+		if client != nil {
+			return client, nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
 	}
 }
 
 func (s *CoordinatorServer) CheckIn(ctx context.Context, req *cmpb.CheckInRequest) (*cmpb.CheckInResponse, error) {
 	log.Printf("[Coordinator] Iniciando transacción RYW para Vuelo %s", req.FlightId)
-	dnResp, err := s.brokerClient.GetDatanode(ctx, &cmpb.Empty{})
+
+	brokerClient, err := s.waitForBrokerClient(ctx)
+	if err != nil {
+		log.Printf("[Coordinator] Broker no disponible: %v", err)
+		return nil, err
+	}
+
+	dnResp, err := brokerClient.GetDatanode(ctx, &cmpb.Empty{})
 	if err != nil {
 		log.Printf("Error obteniendo Datanode del Broker: %v", err)
 		return nil, err
@@ -81,7 +117,7 @@ func (s *CoordinatorServer) CheckIn(ctx context.Context, req *cmpb.CheckInReques
 
 	req.TargetDatanodeId = targetAddr
 
-	resp, err := s.brokerClient.CheckIn(ctx, req)
+	resp, err := brokerClient.CheckIn(ctx, req)
 	if err != nil {
 		log.Printf("Error en escritura vía Broker: %v", err)
 		return nil, err
@@ -100,17 +136,30 @@ func (s *CoordinatorServer) GetBoardingPass(ctx context.Context, req *cmpb.Board
 		dnClient, conn, err := s.getDatanodeClient(datanodeAddr)
 		if err != nil {
 			log.Printf("Error conectando directo al Datanode %s: %v", datanodeAddr, err)
-			return s.brokerClient.GetBoardingPass(ctx, req)
+
+			brokerClient, err := s.waitForBrokerClient(ctx)
+			if err != nil {
+				log.Printf("[Coordinator] Broker no disponible: %v", err)
+				return nil, err
+			}
+
+			return brokerClient.GetBoardingPass(ctx, req)
 		}
 		defer conn.Close()
 
 		return dnClient.GetBoardingPass(ctx, req)
 
-	} else {
-		log.Printf("[Coordinador] Sin sesión para %s. Redirigiendo al Broker.", req.FlightId)
-		//Broker
-		return s.brokerClient.GetBoardingPass(ctx, req)
 	}
+
+	log.Printf("[Coordinador] Sin sesión para %s. Redirigiendo al Broker.", req.FlightId)
+
+	brokerClient, err := s.waitForBrokerClient(ctx)
+	if err != nil {
+		log.Printf("[Coordinator] Broker no disponible: %v", err)
+		return nil, err
+	}
+
+	return brokerClient.GetBoardingPass(ctx, req)
 }
 
 func (s *CoordinatorServer) GetSeats(ctx context.Context, req *cmpb.SeatsRequest) (*cmpb.SeatsResponse, error) {
@@ -124,15 +173,27 @@ func (s *CoordinatorServer) GetSeats(ctx context.Context, req *cmpb.SeatsRequest
 		if err != nil {
 			log.Printf("Error conectando directo al Datanode %s: %v", datanodeAddr, err)
 			// Broker
-			return s.brokerClient.GetSeats(ctx, req)
+			brokerClient, err := s.waitForBrokerClient(ctx)
+			if err != nil {
+				log.Printf("[Coordinator] Broker no disponible: %v", err)
+				return nil, err
+			}
+
+			return brokerClient.GetSeats(ctx, req)
 		}
 		defer conn.Close()
 
 		return dnClient.GetSeats(ctx, req)
 
-	} else {
-		log.Printf("[Coordinador] Sin sesión para %s. Solicitando asientos vía BROKER.", req.FlightId)
-		// Broker
-		return s.brokerClient.GetSeats(ctx, req)
 	}
+
+	log.Printf("[Coordinador] Sin sesión para %s. Solicitando asientos vía BROKER.", req.FlightId)
+
+	brokerClient, err := s.waitForBrokerClient(ctx)
+	if err != nil {
+		log.Printf("[Coordinator] Broker no disponible: %v", err)
+		return nil, err
+	}
+
+	return brokerClient.GetSeats(ctx, req)
 }

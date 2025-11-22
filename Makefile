@@ -42,16 +42,8 @@ proto:
 	@echo "✅ Generación completada correctamente."
 
 clean:
-	@echo "==> Limpiando archivos generados..."
-	@for dir in $(PROTO_DIRS); do \
-		if [ "$$dir" = "broker" ]; then subdir=$(SUBDIR_broker); fi; \
-		if [ "$$dir" = "common" ]; then subdir=$(SUBDIR_common); fi; \
-		if [ "$$dir" = "consensus" ]; then subdir=$(SUBDIR_consensus); fi; \
-		if [ "$$dir" = "coordinator" ]; then subdir=$(SUBDIR_coordinator); fi; \
-		if [ "$$dir" = "datanode" ]; then subdir=$(SUBDIR_datanode); fi; \
-		rm -rf $(PROTO_ROOT)/$$dir/$$subdir; \
-	done
-	@echo "🧹 Limpieza completa."
+        @echo "==> Limpieza omitida: se conservan todos los archivos en $(PROTO_ROOT)"
+        @echo "🧹 No se eliminaron archivos ni directorios generados."
 
 # ----------
 # DOCKER
