@@ -1,13 +1,7 @@
 # ---------- STAGE 1: BUILD ----------
 FROM golang:1.25-alpine AS builder
 
-WORKDIR /go/src/lab_3
-
-# Fuerza modo módulo y deshabilita workspaces que puedan desviar las imports
-# locales durante la compilación dentro del contenedor.
-ENV GO111MODULE=on \
-    GOWORK=off \
-    GOFLAGS=-mod=mod
+WORKDIR /app
 
 # Copiar los archivos de dependencias
 COPY go.mod go.sum ./
@@ -17,7 +11,7 @@ RUN go mod download
 COPY . .
 
 # Compilar SOLO el datanode
-RUN GO111MODULE=on GOWORK=off GOFLAGS=-mod=mod CGO_ENABLED=0 GOOS=linux go build -o /app/datanode ./datanode
+RUN GO111MODULE=on CGO_ENABLED=0 GOOS=linux go build -o /app/datanode ./datanode
 
 
 # ---------- STAGE 2: RUNTIME ----------
