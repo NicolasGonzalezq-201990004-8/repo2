@@ -72,7 +72,8 @@ func main() {
 
 	brokerAddr := os.Getenv("BROKER_ADDR")
 	if brokerAddr == "" {
-		log.Fatal("BROKER_ADDR no definido")
+		brokerAddr = "broker:50050"
+		log.Printf("[WARN] BROKER_ADDR no definido, usando default local: %s", brokerAddr)
 	}
 
 	rand.Seed(time.Now().UnixNano())

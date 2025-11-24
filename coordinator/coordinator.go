@@ -30,7 +30,8 @@ type CoordinatorServer struct {
 func NewCoordinatorServer() *CoordinatorServer {
 	brokerAddr := os.Getenv("BROKER_ADDR")
 	if brokerAddr == "" {
-		log.Fatal("BROKER_ADDR no configurada")
+		brokerAddr = "broker:50050"
+		log.Printf("[WARN] BROKER_ADDR no configurada, usando default local: %s", brokerAddr)
 	}
 
 	s := &CoordinatorServer{
