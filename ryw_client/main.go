@@ -60,13 +60,14 @@ func loadFlightCatalog() []string {
 func main() {
 	coordAddr := os.Getenv("COORDINATOR_ADDR")
 	if coordAddr == "" {
-		log.Fatal("COORDINATOR_ADDR no configurada")
+		coordAddr = "coordinator:50070"
+		log.Printf("[WARN] COORDINATOR_ADDR no configurada, usando default local: %s", coordAddr)
 	}
 
 	clientID := os.Getenv("CLIENT_ID")
 	if clientID == "" {
-		log.Fatal("CLIENT_ID NO CONFIGURADA")
 		clientID = "Pasajero-Genérico"
+		log.Printf("[WARN] CLIENT_ID no configurado, usando identificador por defecto: %s", clientID)
 	}
 
 	availableFlights := loadFlightCatalog()
