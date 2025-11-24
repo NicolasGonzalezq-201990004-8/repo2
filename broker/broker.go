@@ -50,16 +50,15 @@ const (
 func NewBrokerServer() *BrokerServer {
 	datanodeAddrsStr := os.Getenv("DATANODE_ADDRESSES")
 	if datanodeAddrsStr == "" {
-		log.Println("[WARN] DATANODE_ADDRESSES no configurada. Usando mock local.")
-		// Usar direcciones locales no funcionales que satisfagan el strings.Split
-		datanodeAddrsStr = "127.0.0.1:1,127.0.0.1:2"
+		log.Println("[WARN] DATANODE_ADDRESSES no configurada. Usando layout local predeterminado.")
+		datanodeAddrsStr = "datanode1:50051,datanode2:50051"
 	}
 	datanodeAddrs := splitAndTrim(datanodeAddrsStr)
 
 	consensusAddrsStr := os.Getenv("CONSENSUS_ADDRESSES")
 	if consensusAddrsStr == "" {
-		log.Println("[WARN] CONSENSUS_ADDRESSES no configurada. Usando mock local.")
-		consensusAddrsStr = "127.0.0.1:3,127.0.0.1:4,127.0.0.1:5"
+		log.Println("[WARN] CONSENSUS_ADDRESSES no configurada. Usando layout local predeterminado.")
+		consensusAddrsStr = "consensus1:50060,consensus2:50060"
 	}
 	consensusAddrs := splitAndTrim(consensusAddrsStr)
 

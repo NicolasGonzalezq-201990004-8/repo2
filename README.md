@@ -165,38 +165,34 @@ Simulan a los usuarios que consumen información pública de manera pasiva
 ---
 
 ### 🐳 `docker-compose.yml`
-Define la red completa del laboratorio.  
-Levanta todos los contenedores (coordinador, broker, 3 datanodes, 3 consensus nodes, 5 clientes) con sus respectivos puertos.
+Template mínimo para trabajo local con nombres de contenedor como endpoints (`broker:50050`, `datanode2:50051`, etc.).
+
+Servicios incluidos por defecto:
+
+| Servicio      | Puerto host -> contenedor |
+| ------------- | -------------------------- |
+| Broker        | 50050 -> 50050            |
+| Datanode 1    | 50051 -> 50051            |
+| Datanode 2    | 50052 -> 50051            |
+| Consensus 1   | 50060 -> 50060            |
+| Consensus 2   | 50061 -> 50060            |
+| Coordinator   | 50070 -> 50070            |
+
+Un cliente MR y un cliente RYW se conectan internamente usando los nombres de los servicios, sin exponer puertos adicionales.
 
 ---
 
 ### 🧰 `Makefile`
-Atajos para ejecutar configuraciones específicas (por ejemplo):
+Atajos para el nuevo modo local:
 
 ```bash
-make docker-up         # Levanta todos los servicios en una sola VM
-make docker-down       # Detiene y limpia contenedores
-make docker-vm1        # Levanta los contenedores asignados a la VM1
-make docker-vm2        # Levanta los contenedores asignados a la VM2
-make docker-vm3        # Levanta los contenedores asignados a la VM3
-make docker-vm4        # Levanta los contenedores asignados a la VM4
-make docker-logs       # Muestra logs de todos los servicios levantados en la VM actual
-make docker-logs-vmX   # Muestra logs solo de los servicios del perfil vmX (por ejemplo vm1)
-make clean             # Detiene y borra artefactos generados por los .proto
-
+make docker-up     # Construye y levanta todo el clúster en esta máquina
+make docker-down   # Detiene y elimina los contenedores
+make docker-logs   # Sigue los logs de todos los servicios
+make clean         # Limpia artefactos generados por los .proto
 ```
 
-> Cada VM debe clonar el repositorio y ejecutar el `make docker-vmx` que le corresponda.
-> Para ver los `fmt.Println` y logs de cada contenedor, ejecuta `make docker-logs-vmx` en esa VM (o `make docker-logs` si levantaste todo con `make docker-up`).
-
-#### Distribución por máquina virtual
-
-| VM  | IP            | Servicios incluidos                                 |
-| --- | ------------- | ---------------------------------------------------- |
-| VM1 | 10.35.168.15  | Broker, Datanode 3, CLI RYW 1, CLI MR 1             |
-| VM2 | 10.35.168.16  | Nodo de consenso 1, CLI RYW 2, CLI MR 2             |
-| VM3 | 10.35.168.17  | Nodo de consenso 2, Datanode 1, CLI RYW 3           |
-| VM4 | 10.35.168.112 | Coordinador, Nodo de consenso 3, Datanode 2         |
+> Ya no se requieren múltiples perfiles o IPs de distintas VMs. Todo se resuelve en la red de Docker local usando los nombres de los servicios.
 
 Los contenedores ya exponen los puertos gRPC directamente en la IP de cada host para que las instancias en otras VMs puedan conectarse (p. ej. broker en `10.35.168.15:50050`, datanodes en `:50051` y nodos de consenso en `:50060`).
 
