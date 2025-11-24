@@ -12,19 +12,11 @@ services:
       - "50050:50050"
     environment:
       - BROKER_PORT=50050
-      - DATANODE_ADDRESSES=datanode1:50051,datanode2:50051,datanode3:50051
-      - CONSENSUS_ADDRESSES=consensus1:50060,consensus2:50060,consensus3:50060
+      - DATANODE_ADDRESSES=datanode1:50051,datanode2:50051
+      - CONSENSUS_ADDRESSES=consensus1:50060,consensus2:50060
 
-  mr_client1:
-    container_name: mr_client1
-    build:
-      context: .
-      dockerfile: mr_client/Dockerfile
-    environment:
-      - BROKER_ADDR=broker:50050
-
-  mr_client2:
-    container_name: mr_client2
+  mr_client:
+    container_name: mr_client
     build:
       context: .
       dockerfile: mr_client/Dockerfile
@@ -38,7 +30,7 @@ services:
     environment:
       - DATANODE_ID=D1
       - DATANODE_ADDR=datanode1:50051
-      - DATANODE_ADDRESSES=datanode1:50051,datanode2:50051,datanode3:50051
+      - DATANODE_ADDRESSES=datanode1:50051,datanode2:50051
       - DATANODE_PORT=50051
     ports:
       - "50051:50051"
@@ -50,22 +42,10 @@ services:
     environment:
       - DATANODE_ID=D2
       - DATANODE_ADDR=datanode2:50051
-      - DATANODE_ADDRESSES=datanode1:50051,datanode2:50051,datanode3:50051
+      - DATANODE_ADDRESSES=datanode1:50051,datanode2:50051
       - DATANODE_PORT=50051
     ports:
       - "50052:50051"
-
-  datanode3:
-    build:
-      context: .
-      dockerfile: datanode/Dockerfile
-    environment:
-      - DATANODE_ID=D3
-      - DATANODE_ADDR=datanode3:50051
-      - DATANODE_ADDRESSES=datanode1:50051,datanode2:50051,datanode3:50051
-      - DATANODE_PORT=50051
-    ports:
-      - "50053:50051"
 
   # ----------------------------------------
   # CLÚSTER DE CONSENSO (ATC)
@@ -81,7 +61,7 @@ services:
     environment:
       - NODE_ID=ATC-1
       - CONSENSUS_PORT=:50060
-      - PEER_ADDRESSES=ATC-2=consensus2:50060,ATC-3=consensus3:50060
+      - PEER_ADDRESSES=ATC-2=consensus2:50060
 
   consensus2:
     container_name: consensus2
@@ -93,19 +73,7 @@ services:
     environment:
       - NODE_ID=ATC-2
       - CONSENSUS_PORT=:50060
-      - PEER_ADDRESSES=ATC-1=consensus1:50060,ATC-3=consensus3:50060
-
-  consensus3:
-    container_name: consensus3
-    build:
-      context: .
-      dockerfile: consensus/Dockerfile
-    ports:
-      - "50062:50060"
-    environment:
-      - NODE_ID=ATC-3
-      - CONSENSUS_PORT=:50060
-      - PEER_ADDRESSES=ATC-1=consensus1:50060,ATC-2=consensus2:50060
+      - PEER_ADDRESSES=ATC-1=consensus1:50060
 
   # COORDINADOR
   coordinator:
@@ -118,27 +86,11 @@ services:
       - COORDINATOR_PORT=:50070
       - BROKER_ADDR=broker:50050
 
-  # CLIENTES RYW (Pasajeros)
-  ryw_client1:
+  # CLIENTE RYW (Pasajero)
+  ryw_client:
     build:
       context: .
       dockerfile: ryw_client/Dockerfile
     environment:
       - CLIENT_ID=Pasajero-1
-      - COORDINATOR_ADDR=coordinator:50070
-
-  ryw_client2:
-    build:
-      context: .
-      dockerfile: ryw_client/Dockerfile
-    environment:
-      - CLIENT_ID=Pasajero-2
-      - COORDINATOR_ADDR=coordinator:50070
-
-  ryw_client3:
-    build:
-      context: .
-      dockerfile: ryw_client/Dockerfile
-    environment:
-      - CLIENT_ID=Pasajero-3
       - COORDINATOR_ADDR=coordinator:50070

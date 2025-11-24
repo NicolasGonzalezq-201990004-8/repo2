@@ -51,14 +51,14 @@ func NewBrokerServer() *BrokerServer {
 	datanodeAddrsStr := os.Getenv("DATANODE_ADDRESSES")
 	if datanodeAddrsStr == "" {
 		log.Println("[WARN] DATANODE_ADDRESSES no configurada. Usando layout local predeterminado.")
-		datanodeAddrsStr = "datanode1:50051,datanode2:50051,datanode3:50051"
+		datanodeAddrsStr = "datanode1:50051,datanode2:50051"
 	}
 	datanodeAddrs := splitAndTrim(datanodeAddrsStr)
 
 	consensusAddrsStr := os.Getenv("CONSENSUS_ADDRESSES")
 	if consensusAddrsStr == "" {
 		log.Println("[WARN] CONSENSUS_ADDRESSES no configurada. Usando layout local predeterminado.")
-		consensusAddrsStr = "consensus1:50060,consensus2:50060,consensus3:50060"
+		consensusAddrsStr = "consensus1:50060,consensus2:50060"
 	}
 	consensusAddrs := splitAndTrim(consensusAddrsStr)
 

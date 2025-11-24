@@ -165,23 +165,20 @@ Simulan a los usuarios que consumen información pública de manera pasiva
 ---
 
 ### 🐳 `docker-compose.yml`
-Define la red completa del laboratorio en un único host.
-Todos los servicios se comunican usando los nombres de los contenedores (por ejemplo, `broker:50050` o `datanode2:50051`), de modo que puedes levantar el clúster completo con un solo comando.
+Template mínimo para trabajo local con nombres de contenedor como endpoints (`broker:50050`, `datanode2:50051`, etc.).
 
-Puertos expuestos en el host para depuración rápida:
+Servicios incluidos por defecto:
 
 | Servicio      | Puerto host -> contenedor |
 | ------------- | -------------------------- |
 | Broker        | 50050 -> 50050            |
 | Datanode 1    | 50051 -> 50051            |
 | Datanode 2    | 50052 -> 50051            |
-| Datanode 3    | 50053 -> 50051            |
 | Consensus 1   | 50060 -> 50060            |
 | Consensus 2   | 50061 -> 50060            |
-| Consensus 3   | 50062 -> 50060            |
 | Coordinator   | 50070 -> 50070            |
 
-Los clientes (`mr_client*` y `ryw_client*`) se conectan internamente usando los nombres de los servicios, sin exponer puertos adicionales.
+Un cliente MR y un cliente RYW se conectan internamente usando los nombres de los servicios, sin exponer puertos adicionales.
 
 ---
 
